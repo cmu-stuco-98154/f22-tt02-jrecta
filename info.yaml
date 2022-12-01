@@ -5,7 +5,7 @@ project:
   source_files:        # If using an HDL, set wokwi_id as 0 and uncomment and list your source files here. Source files must be in ./src
     - top.sv
     - async-fifo.sv
-  top_module:  "jonpalo02_async_fifo"      # put the name of your top module here, make it unique by prepending your github username
+  top_module:  "jonpaolo02_async_fifo"      # put the name of your top module here, make it unique by prepending your github username
 
 # As everyone will have access to all designs, try to make it easy for someone new to your design to know what
 # it does and how to operate it.
@@ -15,7 +15,7 @@ project:
 # This info will be automatically collected and used to make a datasheet for the chip.
 documentation:
   author:       "Jon Recta"      # Your name
-  discord:      "jonpaolo02"      # Your discord handle - make sure to include the # part as well
+  discord:      "jonpaolo02#0802"      # Your discord handle - make sure to include the # part as well
   title:        "Async FIFO"      # Project title
   description:  "A very small asynchonous FIFO"      # Short description of what your project does
   how_it_works: "After reset, run write_clock and assert write_enable with some data on wdata, then while run_clock is running, assert read_enable.
