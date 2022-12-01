@@ -197,7 +197,7 @@ module async_fifo_test;
     @(posedge full);
     repeat(5) @(posedge rclk);
     while(vals_read < VALS)begin
-      @(posedge rclk);
+      @(posedge rclk) #1;
       if(~empty) begin
         re <= '1;
         rval = q.pop_back();
