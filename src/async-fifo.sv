@@ -15,7 +15,7 @@ module async_fifo
   parameter PTR_WIDTH = $clog2(DEPTH)+1;
 
   logic [PTR_WIDTH-1:0] wptr, wptr_gray, rptr, rptr_gray;
-  logic [DEPTH-1:0][WIDTH-1:0] data;
+  logic [WIDTH-1:0] data[DEPTH-1:0];
 
   // store data
   always_ff @(posedge wclk)
