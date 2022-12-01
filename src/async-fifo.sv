@@ -89,8 +89,11 @@ module write_half
     (.binary(wptr), .gray(wptr_gray));
 
   // grey code math...
-  assign full = rptr_gray2[PTR_WIDTH-1:PTR_WIDTH-2] == ~wptr_gray[PTR_WIDTH-1:PTR_WIDTH-2]
-                && rptr_gray2[PTR_WIDTH-3:0] == wptr_gray[PTR_WIDTH-3:0];
+  if(PTR_WIDTH > 2)
+    assign full = rptr_gray2[PTR_WIDTH-1 -: 2] == ~wptr_gray[PTR_WIDTH-1 -: 2]
+                  && rptr_gray2[0 +: (PTR_WIDTH-2)] == wptr_gray[0 +: (PTR_WIDTH-2)];
+  else
+    assign full = rptr_gray2 == ~wptr_gray;
 endmodule
 
 module reg_ar

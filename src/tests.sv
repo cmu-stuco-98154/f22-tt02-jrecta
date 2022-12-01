@@ -16,8 +16,8 @@ module gray2bin_test;
 endmodule // gray2bin_test
 
 module async_fifo_test;
-  parameter WIDTH=4;
-  parameter DEPTH=4;
+  parameter WIDTH=3;
+  parameter DEPTH=8;
 
   logic [WIDTH-1:0] q[$];
 
@@ -35,7 +35,7 @@ module async_fifo_test;
 
   initial begin
     rclk = '0;
-    forever #5 rclk = ~rclk;
+    forever #7 rclk = ~rclk;
   end
 
   initial begin
@@ -46,7 +46,7 @@ module async_fifo_test;
     forever #5 wclk = ~wclk;
   end
 
-  parameter VALS=16;
+  parameter VALS=32;
   initial begin
     wdone = '0;
     vals_written = 0;

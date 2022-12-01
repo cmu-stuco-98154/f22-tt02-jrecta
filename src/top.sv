@@ -4,7 +4,7 @@ module jonpaolo02_async_fifo (
                               );
 
 
-  async_fifo #(.WIDTH(3), .DEPTH(4)) top
+  async_fifo #(.WIDTH(3), .DEPTH(8)) top
     (.rst(io_in[2]),
 
      .wclk(io_in[0]), .we(io_in[3]),
