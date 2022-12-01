@@ -43,19 +43,13 @@ module read_half
 
   logic [PTR_WIDTH-1:0] wptr_gray1, wptr_gray2, wptr_bin;
 
-  always_ff @(posedge rclk, posedge rst)
-    if(rst) begin
-      rptr <= '0;
-    end
-    else if(re && ~empty) begin
-      rptr <= rptr + (PTR_WIDTH-1)'(1);
-    end
 
-  always_ff @(posedge rclk, posedge rst)
-    if(rst)
-      {wptr_gray1, wptr_gray2} <= '0;
-    else
-      {wptr_gray1, wptr_gray2} <= {wptr_gray, wptr_gray1};
+  reg_ar #(PTR_WIDTH) rptr_reg
+    (.rst, .clk(rclk), .en(re & ~empty),
+     .d(rptr + (PTR_WIDTH)'(1)), .q(rptr));
+  reg_ar #(2*PTR_WIDTH) wptr_gray_sync
+    (.rst, .clk(rclk), .en('1),
+     .d({wptr_gray, wptr_gray1}), .q({wptr_gray1, wptr_gray2}));
 
   bin2gray #(PTR_WIDTH) rptr_b2g
     (.binary(rptr), .gray(rptr_gray));
@@ -72,24 +66,31 @@ module write_half
 
   logic [PTR_WIDTH-1:0] rptr_gray1, rptr_gray2, rptr_bin;
 
-  always_ff @(posedge wclk, posedge rst)
-    if(rst)
-      wptr <= '0;
-    else if(we && ~full)
-      wptr <= wptr + (PTR_WIDTH-1)'(1);
-
-  always_ff @(posedge wclk, posedge rst)
-    if(rst)
-      {rptr_gray1, rptr_gray2} <= '0;
-    else
-      {rptr_gray1, rptr_gray2} <= {rptr_gray, rptr_gray1};
+  reg_ar #(PTR_WIDTH) wptr_reg
+    (.rst, .clk(wclk), .en(we & ~full),
+     .d(wptr + (PTR_WIDTH)'(1)), .q(wptr));
+  reg_ar #(2*PTR_WIDTH) rptr_gray_sync
+    (.rst, .clk(wclk), .en('1),
+     .d({rptr_gray, rptr_gray1}), .q({rptr_gray1, rptr_gray2}));
 
   bin2gray #(PTR_WIDTH) wptr_b2g
     (.binary(wptr), .gray(wptr_gray));
 
-   assign full = rptr_gray2[PTR_WIDTH-1:PTR_WIDTH-2] == ~wptr_gray[PTR_WIDTH-1:PTR_WIDTH-2]
-                 && rptr_gray2[PTR_WIDTH-3:0] == wptr_gray[PTR_WIDTH-3:0];
+  assign full = rptr_gray2[PTR_WIDTH-1:PTR_WIDTH-2] == ~wptr_gray[PTR_WIDTH-1:PTR_WIDTH-2]
+                && rptr_gray2[PTR_WIDTH-3:0] == wptr_gray[PTR_WIDTH-3:0];
 endmodule
+
+module reg_ar
+  #(parameter WIDTH)
+  (input logic clk, rst, en,
+   input logic[WIDTH-1:0] d,
+   output logic[WIDTH-1:0] q);
+  always_ff @(posedge clk, posedge rst)
+    if(rst)
+      q <= '0;
+    else if(en)
+      q <= d;
+endmodule // reg_ar
 
 module gray2bin
   #(parameter WIDTH)
@@ -150,8 +151,9 @@ module async_fifo_test;
 
   initial begin
     wclk = '0;
-    rst = '1;
-    #10 rst = '0;
+    rst = '0;
+    #1 rst = '1;
+    #9 rst = '0;
     forever #5 wclk = ~wclk;
   end
 
