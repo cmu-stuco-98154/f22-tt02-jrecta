@@ -11,22 +11,26 @@ module async_fifo
    output logic empty,
    output logic[WIDTH-1:0] rdata);
 
+  // extra bit for full detection
   parameter PTR_WIDTH = $clog2(DEPTH)+1;
 
   logic [PTR_WIDTH-1:0] wptr, wptr_gray, rptr, rptr_gray;
   logic [DEPTH-1:0][WIDTH-1:0] data;
 
+  // store data
   always_ff @(posedge wclk)
     if(we & ~full)
       data[wptr[PTR_WIDTH-2:0]] <= wdata;
   assign rdata = data[rptr[PTR_WIDTH-2:0]];
 
+  // all logic in write domain
   write_half #(PTR_WIDTH) frontend
     (.rst, .wclk, .we,
      .rptr_gray,
      .wptr, .wptr_gray,
      .full);
 
+  // all logic in read domain
   read_half #(PTR_WIDTH) backend
     (.rst, .rclk, .re,
      .wptr_gray,
@@ -41,19 +45,23 @@ module read_half
    output logic [PTR_WIDTH-1:0] rptr, rptr_gray,
    output logic empty);
 
-  logic [PTR_WIDTH-1:0] wptr_gray1, wptr_gray2, wptr_bin;
+  logic [PTR_WIDTH-1:0] wptr_gray1, wptr_gray2;
 
-
+  // rptr counter
   reg_ar #(PTR_WIDTH) rptr_reg
     (.rst, .clk(rclk), .en(re & ~empty),
      .d(rptr + (PTR_WIDTH)'(1)), .q(rptr));
+
+  // sync wptr_gray
   reg_ar #(2*PTR_WIDTH) wptr_gray_sync
     (.rst, .clk(rclk), .en('1),
      .d({wptr_gray, wptr_gray1}), .q({wptr_gray1, wptr_gray2}));
 
+  // generate gray code
   bin2gray #(PTR_WIDTH) rptr_b2g
     (.binary(rptr), .gray(rptr_gray));
 
+  // empty is easy to check
   assign empty = wptr_gray2 == rptr_gray;
 endmodule
 
@@ -64,18 +72,23 @@ module write_half
    output logic [PTR_WIDTH-1:0] wptr, wptr_gray,
    output logic full);
 
-  logic [PTR_WIDTH-1:0] rptr_gray1, rptr_gray2, rptr_bin;
+  logic [PTR_WIDTH-1:0] rptr_gray1, rptr_gray2;
 
+  // wptr counter
   reg_ar #(PTR_WIDTH) wptr_reg
     (.rst, .clk(wclk), .en(we & ~full),
      .d(wptr + (PTR_WIDTH)'(1)), .q(wptr));
+
+  // sync rptr_gray
   reg_ar #(2*PTR_WIDTH) rptr_gray_sync
     (.rst, .clk(wclk), .en('1),
      .d({rptr_gray, rptr_gray1}), .q({rptr_gray1, rptr_gray2}));
 
+  // generate gray code
   bin2gray #(PTR_WIDTH) wptr_b2g
     (.binary(wptr), .gray(wptr_gray));
 
+  // grey code math...
   assign full = rptr_gray2[PTR_WIDTH-1:PTR_WIDTH-2] == ~wptr_gray[PTR_WIDTH-1:PTR_WIDTH-2]
                 && rptr_gray2[PTR_WIDTH-3:0] == wptr_gray[PTR_WIDTH-3:0];
 endmodule
