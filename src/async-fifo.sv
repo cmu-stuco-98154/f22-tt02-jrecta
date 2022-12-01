@@ -57,13 +57,10 @@ module read_half
     else
       {wptr_gray1, wptr_gray2} <= {wptr_gray, wptr_gray1};
 
-  gray2bin #(PTR_WIDTH) wptr_g2b
-    (.gray(wptr_gray2), .binary(wptr_bin));
-
-  assign empty = wptr_bin == rptr;
-
   bin2gray #(PTR_WIDTH) rptr_b2g
     (.binary(rptr), .gray(rptr_gray));
+
+  assign empty = wptr_gray2 == rptr_gray;
 endmodule
 
 module write_half
@@ -87,14 +84,11 @@ module write_half
     else
       {rptr_gray1, rptr_gray2} <= {rptr_gray, rptr_gray1};
 
-  gray2bin #(PTR_WIDTH) rptr_g2b
-    (.gray(rptr_gray2), .binary(rptr_bin));
-
-  assign full = rptr_bin[PTR_WIDTH-2:0] == wptr[PTR_WIDTH-2:0] &&
-                rptr_bin[PTR_WIDTH-1] == ~wptr[PTR_WIDTH-1];
-
   bin2gray #(PTR_WIDTH) wptr_b2g
     (.binary(wptr), .gray(wptr_gray));
+
+   assign full = rptr_gray2[PTR_WIDTH-1:PTR_WIDTH-2] == ~wptr_gray[PTR_WIDTH-1:PTR_WIDTH-2]
+                 && rptr_gray2[PTR_WIDTH-3:0] == wptr_gray[PTR_WIDTH-3:0];
 endmodule
 
 module gray2bin
