@@ -17,9 +17,9 @@ module async_fifo
   logic [DEPTH-1:0][WIDTH-1:0] data;
 
   always_ff @(posedge wclk)
-    if(we)
-      data[wptr] <= wdata;
-  assign rdata = data[rptr];
+    if(we & ~full)
+      data[wptr[PTR_WIDTH-2:0]] <= wdata;
+  assign rdata = data[rptr[PTR_WIDTH-2:0]];
 
   write_half #(PTR_WIDTH) frontend
     (.rst, .wclk, .we,
@@ -27,12 +27,44 @@ module async_fifo
      .wptr, .wptr_gray,
      .full);
 
-  // read_half #($clog2(DEPTH)+1) backend
-  // (.rclk, .re,
-  // .wptr_gray,
-  // .rptr, .rpt_gray,
-  // .empty);
+  read_half #(PTR_WIDTH) backend
+    (.rst, .rclk, .re,
+     .wptr_gray,
+     .rptr, .rptr_gray,
+     .empty);
 endmodule: async_fifo
+
+module read_half
+  #(parameter PTR_WIDTH)
+  (input logic rst, rclk, re,
+   input logic [PTR_WIDTH-1:0] wptr_gray,
+   output logic [PTR_WIDTH-1:0] rptr, rptr_gray,
+   output logic empty);
+
+  logic [PTR_WIDTH-1:0] wptr_gray1, wptr_gray2, wptr_bin;
+
+  always_ff @(posedge rclk, posedge rst)
+    if(rst) begin
+      rptr <= '0;
+    end
+    else if(re && ~empty) begin
+      rptr <= rptr + (PTR_WIDTH-1)'(1);
+    end
+
+  always_ff @(posedge rclk, posedge rst)
+    if(rst)
+      {wptr_gray1, wptr_gray2} <= '0;
+    else
+      {wptr_gray1, wptr_gray2} <= {wptr_gray, wptr_gray1};
+
+  gray2bin #(PTR_WIDTH) wptr_g2b
+    (.gray(wptr_gray2), .binary(wptr_bin));
+
+  assign empty = wptr_bin == rptr;
+
+  bin2gray #(PTR_WIDTH) rptr_b2g
+    (.binary(rptr), .gray(rptr_gray));
+endmodule
 
 module write_half
   #(parameter PTR_WIDTH)
@@ -41,19 +73,25 @@ module write_half
    output logic [PTR_WIDTH-1:0] wptr, wptr_gray,
    output logic full);
 
-  logic [PTR_WIDTH-1:0] rptr_bin;
-
-  gray2bin #(PTR_WIDTH) rptr_g2b
-    (.gray(rptr_gray), .binary(rptr_bin));
-
-  assign full = rptr_bin[PTR_WIDTH-2:0] == wptr[PTR_WIDTH-2:0] &&
-                rptr_bin[PTR_WIDTH-1] == ~wptr[PTR_WIDTH-1];
+  logic [PTR_WIDTH-1:0] rptr_gray1, rptr_gray2, rptr_bin;
 
   always_ff @(posedge wclk, posedge rst)
     if(rst)
       wptr <= '0;
     else if(we && ~full)
       wptr <= wptr + (PTR_WIDTH-1)'(1);
+
+  always_ff @(posedge wclk, posedge rst)
+    if(rst)
+      {rptr_gray1, rptr_gray2} <= '0;
+    else
+      {rptr_gray1, rptr_gray2} <= {rptr_gray, rptr_gray1};
+
+  gray2bin #(PTR_WIDTH) rptr_g2b
+    (.gray(rptr_gray2), .binary(rptr_bin));
+
+  assign full = rptr_bin[PTR_WIDTH-2:0] == wptr[PTR_WIDTH-2:0] &&
+                rptr_bin[PTR_WIDTH-1] == ~wptr[PTR_WIDTH-1];
 
   bin2gray #(PTR_WIDTH) wptr_b2g
     (.binary(wptr), .gray(wptr_gray));
@@ -92,3 +130,88 @@ module gray2bin_test;
     #10 $finish;
   end // initial begin
 endmodule // gray2bin_test
+
+module async_fifo_test;
+  parameter WIDTH=4;
+  parameter DEPTH=4;
+
+  logic [WIDTH-1:0] q[$];
+
+  logic rst;
+  logic wclk, we;
+  logic full;
+  logic[WIDTH-1:0] wdata;
+  logic rclk, re;
+  logic empty;
+  logic[WIDTH-1:0] rdata;
+  int wval,rval, vals_written, vals_read;
+  logic rdone, wdone;
+
+  async_fifo #(.WIDTH(WIDTH), .DEPTH(DEPTH)) DUT(.*);
+
+  initial begin
+    rclk = '0;
+    forever #5 rclk = ~rclk;
+  end
+
+  initial begin
+    wclk = '0;
+    rst = '1;
+    #10 rst = '0;
+    forever #5 wclk = ~wclk;
+  end
+
+  parameter VALS=16;
+  initial begin
+    wdone = '0;
+    vals_written = 0;
+    wval = $urandom(240);
+    we = '0;
+    @(posedge wclk);
+    while(vals_written < VALS) begin
+      #1;
+      if(~full) begin
+        we <= '1;
+        wval = vals_written % (2**WIDTH);// $urandom() % (2**WIDTH);
+        wdata <= wval;
+        q.push_front(wval);
+        // vals_written++;
+      end else begin
+        we <= '0;
+      end
+      @(posedge wclk);
+      if(we) vals_written++;
+
+    end
+    @(posedge wclk);
+    we <= '0;
+    repeat(10) @(posedge wclk);
+    wdone <= '1;
+  end
+
+  initial begin
+    rdone = '0;
+    vals_read = 0;
+    rval = -1;
+    re = '0;
+    @(posedge full);
+    repeat(5) @(posedge rclk);
+    while(vals_read < VALS)begin
+      @(posedge rclk);
+      if(~empty) begin
+        re <= '1;
+        rval = q.pop_back();
+        #1 assert(rdata == rval);
+        vals_read++;
+      end
+      else begin
+        re <= '0;
+      end
+    end
+    rdone <= '1;
+  end
+
+  initial begin
+    wait(rdone && wdone) $finish;
+  end
+endmodule
